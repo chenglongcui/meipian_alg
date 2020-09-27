@@ -1,14 +1,7 @@
 # -*- coding: utf-8 -*-
-'''
-Created on Oct 10, 2018
-Tensorflow Implementation of Neural Graph Collaborative Filtering (NGCF) model in:
-Wang Xiang et al. Neural Graph Collaborative Filtering. In SIGIR 2019.
-
-@author: Xiang Wang (xiangwang@u.nus.edu)
-'''
 from parser import parse_args
 from load_data import *
-# from evaluator import eval_score_matrix_foldout
+from evaluate_foldout import eval_score_matrix_foldout
 import multiprocessing
 import heapq
 import numpy as np
@@ -16,14 +9,15 @@ import numpy as np
 cores = multiprocessing.cpu_count() // 2
 
 
-def test(sess, model, users_to_test, drop_flag=False, train_set_flag=0):
+def test(sess, model, users_to_test, batch_size, item_num, data_generator, layer_size, drop_flag=False,
+         train_set_flag=0):
     # B: batch size
     # N: the number of items
     top_show = np.sort(model.Ks)
     max_top = max(top_show)
     result = {'precision': np.zeros(len(model.Ks)), 'recall': np.zeros(len(model.Ks)), 'ndcg': np.zeros(len(model.Ks))}
 
-    u_batch_size = BATCH_SIZE
+    u_batch_size = batch_size
 
     test_users = users_to_test
     n_test_users = len(test_users)
@@ -31,7 +25,7 @@ def test(sess, model, users_to_test, drop_flag=False, train_set_flag=0):
 
     count = 0
     all_result = []
-    item_batch = range(ITEM_NUM)
+    item_batch = range(item_num)
     for u_batch_id in range(n_user_batchs):
         start = u_batch_id * u_batch_size
         end = (u_batch_id + 1) * u_batch_size
@@ -43,8 +37,8 @@ def test(sess, model, users_to_test, drop_flag=False, train_set_flag=0):
         else:
             rate_batch = sess.run(model.batch_ratings, {model.users: user_batch,
                                                         model.pos_items: item_batch,
-                                                        model.node_dropout: [0.] * len(eval(args.layer_size)),
-                                                        model.mess_dropout: [0.] * len(eval(args.layer_size))})
+                                                        model.node_dropout: [0.] * len(eval(layer_size)),
+                                                        model.mess_dropout: [0.] * len(eval(layer_size))})
         rate_batch = np.array(rate_batch)  # (B, N)
         test_items = []
         if train_set_flag == 0:

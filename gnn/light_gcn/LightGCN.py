@@ -15,9 +15,12 @@ import threading
 import tensorflow as tf
 from tensorflow.python.client import device_lib
 from helper import *
-from batch_test import *
+from batch_test import test
 import numpy as np
 import time
+from parser import parse_args
+from load_data import Data
+import scipy.sparse as sp
 
 os.environ['TF_CPP_MIN_LOG_LEVEL'] = '2'
 
@@ -529,7 +532,9 @@ if __name__ == '__main__':
             # get the performance from pretrained model.
             if args.report != 1:
                 users_to_test = list(data_generator.test_set.keys())
-                ret = test(sess, model, users_to_test, drop_flag=True)
+                ret = test(sess, model, users_to_test, drop_flag=True, batch_size=BATCH_SIZE, item_num=ITEM_NUM,
+                           data_generator=data_generator, layer_size=args.layer_size)
+
                 cur_best_pre_0 = ret['recall'][0]
 
                 pretrain_ret = 'pretrained model recall=[%s], precision=[%s], ' \
@@ -566,7 +571,8 @@ if __name__ == '__main__':
             % (args.embed_size, args.lr, args.layer_size, args.keep_prob, args.regs, args.loss_type, args.adj_type))
 
         for i, users_to_test in enumerate(users_to_test_list):
-            ret = test(sess, model, users_to_test, drop_flag=True)
+            ret = test(sess, model, users_to_test, drop_flag=True, batch_size=BATCH_SIZE, item_num=ITEM_NUM,
+                       data_generator=data_generator, layer_size=args.layer_size)
 
             final_perf = "recall=[%s], precision=[%s], ndcg=[%s]" % \
                          (', '.join(['%.5f' % r for r in ret['recall']]),
@@ -597,6 +603,7 @@ if __name__ == '__main__':
     stopping_step = 0
     should_stop = False
 
+    print("the batch number is :", data_generator.n_train // args.batch_size + 1)
     for epoch in range(1, args.epoch + 1):
         t1 = time.time()
         loss, mf_loss, emb_loss, reg_loss = 0., 0., 0., 0.
@@ -609,7 +616,6 @@ if __name__ == '__main__':
         sample_last = sample_thread()
         sample_last.start()
         sample_last.join()
-        print("the batch number is :", n_batch)
         for idx in range(n_batch):
             train_cur = train_thread(model, sess, sample_last)
             sample_next = sample_thread()
@@ -623,12 +629,12 @@ if __name__ == '__main__':
             users, pos_items, neg_items = sample_last.data
             _, batch_loss, batch_mf_loss, batch_emb_loss, batch_reg_loss = train_cur.data
             sample_last = sample_next
-            print('time: %s\tglobal_step:%d\tbatch_loss: %.8f\tmf_loss: %.8f\temb_loss: %.8f'
-                  % (time.strftime("%Y-%m-%d %H:%M:%S", time.localtime()), idx, batch_loss, mf_loss, emb_loss))
+            # print('time: %s\tglobal_step:%d\tbatch_loss: %.8f\tmf_loss: %.8f\temb_loss: %.8f'
+            #       % (time.strftime("%Y-%m-%d %H:%M:%S", time.localtime()), idx, batch_loss, mf_loss, emb_loss))
             loss += batch_loss / n_batch
             mf_loss += batch_mf_loss / n_batch
             emb_loss += batch_emb_loss / n_batch
-
+            # break
         summary_train_loss = sess.run(model.merged_train_loss,
                                       feed_dict={model.train_loss: loss, model.train_mf_loss: mf_loss,
                                                  model.train_emb_loss: emb_loss, model.train_reg_loss: reg_loss})
@@ -644,7 +650,10 @@ if __name__ == '__main__':
                 print(perf_str)
             continue
         users_to_test = list(data_generator.train_items.keys())
-        ret = test(sess, model, users_to_test, drop_flag=True, train_set_flag=1)
+        print("start testing step")
+        # print(users_to_test)
+        ret = test(sess, model, users_to_test, drop_flag=True, train_set_flag=1, batch_size=BATCH_SIZE,
+                   item_num=ITEM_NUM, data_generator=data_generator, layer_size=args.layer_size)
         perf_str = 'Epoch %d: train==[%.5f=%.5f + %.5f + %.5f], recall=[%s], precision=[%s], ndcg=[%s]' % \
                    (epoch, loss, mf_loss, emb_loss, reg_loss,
                     ', '.join(['%.5f' % r for r in ret['recall']]),
@@ -688,7 +697,11 @@ if __name__ == '__main__':
         train_writer.add_summary(summary_test_loss, epoch // 20)
         t2 = time.time()
         users_to_test = list(data_generator.test_set.keys())
-        ret = test(sess, model, users_to_test, drop_flag=True)
+        ret = test(sess, model, users_to_test, drop_flag=True, batch_size=BATCH_SIZE, item_num=ITEM_NUM,
+                   data_generator=data_generator, layer_size=args.layer_size)
+
+        print("ret")
+        print(ret)
         summary_test_acc = sess.run(model.merged_test_acc,
                                     feed_dict={model.test_rec_first: ret['recall'][0],
                                                model.test_rec_last: ret['recall'][-1],
@@ -725,10 +738,12 @@ if __name__ == '__main__':
         if ret['recall'][0] == cur_best_pre_0 and args.save_flag == 1:
             save_saver.save(sess, weights_save_path + '/weights', global_step=epoch)
             print('save the weights in path: ', weights_save_path)
+    print(rec_loger)
     recs = np.array(rec_loger)
     pres = np.array(pre_loger)
     ndcgs = np.array(ndcg_loger)
 
+    print(recs, type(recs))
     best_rec_0 = max(recs[:, 0])
     idx = list(recs[:, 0]).index(best_rec_0)
 

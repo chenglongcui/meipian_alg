@@ -6,7 +6,7 @@ Wang Xiang et al. Neural Graph Collaborative Filtering. In SIGIR 2019.
 
 @author: Xiang Wang (xiangwang@u.nus.edu)
 '''
-import argparse
+# import argparse
 import tensorflow as tf
 
 
@@ -90,12 +90,12 @@ def parse_args():
                             "0: No pretrain, -1: Pretrain with the learned embeddings, 1:Pretrain with stored models.")
     tf.flags.DEFINE_integer("verbose", 1, "Interval of evaluation.")
     tf.flags.DEFINE_integer("is_norm", 1, "Interval of evaluation.")
-    tf.flags.DEFINE_integer("epoch", 2, "Number of epoch.")
+    tf.flags.DEFINE_integer("epoch", 100, "Number of epoch.")
     tf.flags.DEFINE_integer("embed_size", 64, "Embedding size.")
     tf.flags.DEFINE_string("layer_size", "[64, 64, 64, 64]", "Output sizes of every layer")
     tf.flags.DEFINE_integer("batch_size", 1024, "Batch size.")
     tf.flags.DEFINE_string("regs", "[1e-5,1e-5,1e-2]", "Regularizations.")
-    tf.flags.DEFINE_float("lr", 0.01, "Learning rate.")
+    tf.flags.DEFINE_float("lr", 0.001, "Learning rate.")
 
     tf.flags.DEFINE_string("model_type", "lightgcn", "Specify the name of model (lightgcn).")
     tf.flags.DEFINE_string("adj_type", "pre",
