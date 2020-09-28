@@ -643,12 +643,15 @@ if __name__ == '__main__':
             print('ERROR: loss is nan.')
             sys.exit()
 
-        if (epoch % 20) != 0:
+        # 每隔20个epoch打印一次测试集结果
+        if (epoch % 100) != 0:
             if args.verbose > 0 and epoch % args.verbose == 0:
                 perf_str = 'Epoch %d [%.1fs]: train==[%.5f=%.5f + %.5f]' % (
                     epoch, time.time() - t1, loss, mf_loss, emb_loss)
                 print(perf_str)
             continue
+
+        # 满足(epoch % 1000) == 0 执行以下节点
         users_to_test = list(data_generator.train_items.keys())
         print("start testing step")
         # print(users_to_test)

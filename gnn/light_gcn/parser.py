@@ -90,7 +90,7 @@ def parse_args():
                             "0: No pretrain, -1: Pretrain with the learned embeddings, 1:Pretrain with stored models.")
     tf.flags.DEFINE_integer("verbose", 1, "Interval of evaluation.")
     tf.flags.DEFINE_integer("is_norm", 1, "Interval of evaluation.")
-    tf.flags.DEFINE_integer("epoch", 100, "Number of epoch.")
+    tf.flags.DEFINE_integer("epoch", 501, "Number of epoch.")
     tf.flags.DEFINE_integer("embed_size", 64, "Embedding size.")
     tf.flags.DEFINE_string("layer_size", "[64, 64, 64, 64]", "Output sizes of every layer")
     tf.flags.DEFINE_integer("batch_size", 1024, "Batch size.")

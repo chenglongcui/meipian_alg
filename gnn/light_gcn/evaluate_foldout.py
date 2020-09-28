@@ -59,7 +59,7 @@ def mrr(rank, ground_truth):
     return result
 
 
-def eval_score_matrix_foldout(score_matrix, test_items, top_k=50, thread_num=None):
+def eval_score_matrix_foldout(score_matrix, test_items, top_k=20, thread_num=None):
     def _eval_one_user(idx):
         scores = score_matrix[idx]  # all scores of the test user
         test_item = test_items[idx]  # all test items of the test user
