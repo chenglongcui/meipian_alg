@@ -389,7 +389,7 @@ class TwoTowerModelFRV5:
                                                                    self.user_click_item_list_len,
                                                                    self.item_embedding_size,
                                                                    "sum")
-                self.label_item = self.target_item_idx[0]
+                self.label_item = tf.gather(self.target_item_idx, 0)
                 user_item_click_attention_embed = self.get_attention_embedding(self.item_embedding,
                                                                                self.user_click_item_list_idx,
                                                                                self.user_click_item_list_len,
@@ -449,7 +449,6 @@ class TwoTowerModelFRV5:
 
         with tf.name_scope("item_tower"):
             # if self.mode == "train":
-
 
             item_id_embed = tf.nn.embedding_lookup(self.item_embedding, self.target_item_idx)
             cate_id_embed = tf.nn.embedding_lookup(self.cate_embedding, target_cate_idx)

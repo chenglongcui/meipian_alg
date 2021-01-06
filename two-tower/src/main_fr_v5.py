@@ -194,14 +194,14 @@ def main(_):
                     #     softmax_sum = 0.0
 
                     # local test
-                    user_ids, target_item_list, target_cate_list, user_click_item_list_len = sess.run(
+                    user_ids, target_item_list, target_cate_list, label_embedding, list_embed_init, list_embed_mask_output = sess.run(
                         [
                             two_tower_model.user_id,
                             two_tower_model.user_click_item_list,
                             two_tower_model.target_item_idx,
-                            two_tower_model.label_embedding,
-                            # two_tower_model.auc,
-                            # two_tower_model.auc_final
+                            two_tower_model.label_item,
+                            two_tower_model.list_embed_init,
+                            two_tower_model.list_embed_mask_output
                         ])
                     print("user_ids")
                     print(user_ids)
@@ -210,14 +210,12 @@ def main(_):
                     print(target_item_list.shape)
                     print("target_cate_list")
                     print(target_cate_list)
-                    print(target_cate_list.shape)
-                    print("user_click_item_list_len")
-                    print(user_click_item_list_len)
-                    # print(logits.shape)
-                    # print("logits_pos")
-                    # print(logits_pos)
-                    # print("logits_neg")
-                    # print(logits_neg)
+                    print("label_embedding")
+                    print(label_embedding)
+                    print("list_embed_init")
+                    print(list_embed_init)
+                    print("list_embed_mask_output")
+                    print(list_embed_mask_output)
                     # print("auc")
                     # print(auc)
                     # print("auc_final")

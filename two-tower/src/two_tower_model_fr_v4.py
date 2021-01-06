@@ -364,7 +364,6 @@ class TwoTowerModelFRV4:
                 client_type_one_hot = tf.one_hot(self.client_type, self.CLIENT_TYPE_CNT)
 
                 #   concat embedding
-
                 user_embed_concat = tf.concat(
                     [user_item_click_sum_embed, gender_one_hot, client_type_one_hot], axis=-1)
 
@@ -491,9 +490,9 @@ class TwoTowerModelFRV4:
 
     def evaluate(self):
         # 模拟二分类方式计算auc
-        logit_split_pos, logit_split_neg = tf.split(self.logits, [1, 10], axis=1)
+        logit_split_pos, logit_split_neg = tf.split(self.logits, [1, self.NUM_SAMPLED], axis=1)
         # 正样本扩展为与负样本一样的维度
-        logit_split_pos_expand = tf.tile(logit_split_pos, [1, 10])
+        logit_split_pos_expand = tf.tile(logit_split_pos, [1, self.NUM_SAMPLED])
         logit_result = logit_split_pos_expand - logit_split_neg
         auc = tf.reduce_mean(tf.to_float(logit_result > 0))
         return auc
