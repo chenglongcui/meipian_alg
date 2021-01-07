@@ -107,7 +107,7 @@ class TwoTowerModelFRV5:
             self.user_click_item_list_len = tf.count_nonzero(self.user_click_item_list, 1)
             self.training_init_op = self.iterator.make_initializer(self.dataset)
             # batch_size个数的0，需要注意最后一个batch是不足s一个batch_size的
-            self.train_label = tf.zeros(shape=[tf.shape(self.user_id)[0]], dtype=tf.int64)
+            self.train_label = tf.zeros(shape=[tf.shape(self.user_id)[0]], dtype=tf.int32)
         else:
             # self.item_list, self.cate_list, self.tag_list = self.read_item_train_data()
             # if self.mode == "pred":
@@ -348,31 +348,31 @@ class TwoTowerModelFRV5:
         return seq_embedding_final
 
     ## attention 加权平均
-    def get_attention_embedding(self, item_embedding, user_click_item_list, item_id_list_len_batch, label_item,
+    ## attention计算过程：1. 求点击序列与label点积；2. 点积结果取softmax求权重；3. 对序列加权求和
+    def get_attention_embedding(self, item_embedding, user_click_item_list, item_id_list_len_batch, target_item_list,
                                 embedding_size, method):
         # user_click_item_list_idx = self.item_table.lookup(self.user_click_item_list)
+        # embed_init = tf.nn.embedding_lookup(item_embedding, user_click_item_list)
         self.list_embed_init = tf.nn.embedding_lookup(item_embedding, user_click_item_list)
-
-        self.label_embedding = tf.nn.embedding_lookup(item_embedding, label_item)
         embedding_mask = tf.sequence_mask(item_id_list_len_batch, tf.shape(user_click_item_list)[1],
                                           dtype=tf.float32)
         embedding_mask = tf.expand_dims(embedding_mask, -1)
         embedding_mask = tf.tile(embedding_mask, [1, 1, embedding_size])
+        # embedding_mask_2 = embed_init * embedding_mask
+        # 原始点击序列embedding
         self.list_embed_mask_output = self.list_embed_init * embedding_mask
 
-        embedding_sum = tf.reduce_sum(self.list_embed_mask_output, 1)
+        self.target_item_embedding = tf.nn.embedding_lookup(item_embedding, target_item_list)
+        # 1. label与所有序列元素做点积
+        # self.list_embed_mask_dot = tf.multiply(self.list_embed_mask_output, self.target_item_embedding)
+        self.list_embed_mask_matmul = tf.squeeze(
+            tf.matmul(self.target_item_embedding, self.list_embed_mask_output, transpose_b=True))
+        # 2. 点积结果取softmax,求出weight
+        self.list_embed_mask_softmax = tf.nn.softmax(self.list_embed_mask_matmul)
 
-        seq_embedding_final = None
-        if method == 'sum':
-            seq_embedding_final = embedding_sum
-        elif method == 'mean':
-            seq_avg_embedding = tf.div(embedding_sum,
-                                       tf.cast(tf.tile(tf.expand_dims(item_id_list_len_batch, 1),
-                                                       [1, embedding_size]),
-                                               tf.float32))
-            seq_embedding_final = seq_avg_embedding
-
-        return seq_embedding_final
+        # 3. 对点击序列加权求和
+        list_embed_attention_final = tf.matmul(self.list_embed_mask_softmax, self.list_embed_mask_output)
+        return list_embed_attention_final
 
     def build_model(self):
         self.user_click_item_list_idx = tf.string_to_hash_bucket_fast(tf.as_string(self.user_click_item_list),
@@ -382,68 +382,68 @@ class TwoTowerModelFRV5:
         target_cate_idx = tf.string_to_hash_bucket_fast(tf.as_string(self.target_cate_list), self.CATE_CNT)
         target_tag_idx = tf.string_to_hash_bucket_fast(tf.as_string(self.target_tag_list), self.TAG_CNT)
         # # User Embedding Layer
-        with tf.name_scope("user_tower"):
-            with tf.name_scope('user_embedding'):
-                user_item_click_sum_embed = self.get_seq_embedding(self.item_embedding,
-                                                                   self.user_click_item_list_idx,
-                                                                   self.user_click_item_list_len,
-                                                                   self.item_embedding_size,
-                                                                   "sum")
-                self.label_item = tf.gather(self.target_item_idx, 0)
-                user_item_click_attention_embed = self.get_attention_embedding(self.item_embedding,
-                                                                               self.user_click_item_list_idx,
-                                                                               self.user_click_item_list_len,
-                                                                               self.label_item,
-                                                                               self.item_embedding_size,
-                                                                               "sum")
 
-                # one-hot feature
-                gender_one_hot = tf.one_hot(self.gender, self.GENDER_CNT)
-                client_type_one_hot = tf.one_hot(self.client_type, self.CLIENT_TYPE_CNT)
+        with tf.name_scope('user_embedding'):
+            # user_item_click_sum_embed = self.get_seq_embedding(self.item_embedding,
+            #                                                    self.user_click_item_list_idx,
+            #                                                    self.user_click_item_list_len,
+            #                                                    self.item_embedding_size,
+            #                                                    "sum")
+            self.user_item_click_attention_embed = self.get_attention_embedding(self.item_embedding,
+                                                                                self.user_click_item_list_idx,
+                                                                                self.user_click_item_list_len,
+                                                                                self.target_item_idx,
+                                                                                self.item_embedding_size, "sum")
+            # one-hot feature
+            gender_one_hot = tf.tile(tf.expand_dims(tf.one_hot(self.gender, self.GENDER_CNT), 1),
+                                     [1, tf.shape(self.user_item_click_attention_embed)[1], 1])
+            client_type_one_hot = tf.tile(
+                tf.expand_dims(tf.one_hot(self.client_type, self.CLIENT_TYPE_CNT), 1),
+                [1, tf.shape(self.user_item_click_attention_embed)[1], 1])
 
-                #   concat embedding
-                user_embed_concat = tf.concat(
-                    [user_item_click_sum_embed, gender_one_hot, client_type_one_hot], axis=-1)
+            # concat embedding
+            self.user_embed_concat = tf.concat(
+                [self.user_item_click_attention_embed, gender_one_hot, client_type_one_hot], axis=-1)
 
-            with tf.name_scope('layers'):
-                user_layer_1 = tf.layers.dense(inputs=user_embed_concat,
-                                               units=1024,
-                                               activation=tf.nn.tanh,
-                                               name='user_first',
-                                               kernel_initializer=tf.initializers.glorot_normal(seed=1234),
-                                               use_bias=False
-                                               )
-                user_layer_2 = tf.layers.dense(inputs=user_layer_1,
-                                               units=512,
-                                               activation=tf.nn.tanh,
-                                               name='user_second',
-                                               kernel_initializer=tf.initializers.glorot_normal(seed=1234),
-                                               use_bias=False
-                                               )
-                user_layer_3 = tf.layers.dense(inputs=user_layer_2,
-                                               units=128,
-                                               activation=tf.nn.tanh,
-                                               name='user_final',
-                                               kernel_initializer=tf.initializers.glorot_normal(seed=1234),
-                                               use_bias=False
-                                               )
+        with tf.name_scope('layers'):
+            user_layer_1 = tf.layers.dense(inputs=self.user_embed_concat,
+                                           units=1024,
+                                           activation=tf.nn.tanh,
+                                           name='user_first',
+                                           kernel_initializer=tf.initializers.glorot_normal(seed=1234),
+                                           use_bias=False
+                                           )
+            user_layer_2 = tf.layers.dense(inputs=user_layer_1,
+                                           units=512,
+                                           activation=tf.nn.tanh,
+                                           name='user_second',
+                                           kernel_initializer=tf.initializers.glorot_normal(seed=1234),
+                                           use_bias=False
+                                           )
+            user_layer_3 = tf.layers.dense(inputs=user_layer_2,
+                                           units=128,
+                                           activation=tf.nn.tanh,
+                                           name='user_final',
+                                           kernel_initializer=tf.initializers.glorot_normal(seed=1234),
+                                           use_bias=False
+                                           )
 
-                # user参数写入summary
-                # user_first_vars = tf.get_collection(tf.GraphKeys.TRAINABLE_VARIABLES, 'user_first')
-                # user_second_vars = tf.get_collection(tf.GraphKeys.TRAINABLE_VARIABLES, 'user_second')
-                # user_final_vars = tf.get_collection(tf.GraphKeys.TRAINABLE_VARIABLES, 'user_final')
+            # user参数写入summary
+            # user_first_vars = tf.get_collection(tf.GraphKeys.TRAINABLE_VARIABLES, 'user_first')
+            # user_second_vars = tf.get_collection(tf.GraphKeys.TRAINABLE_VARIABLES, 'user_second')
+            # user_final_vars = tf.get_collection(tf.GraphKeys.TRAINABLE_VARIABLES, 'user_final')
 
-                # tf.summary.histogram("user_layer_1_weights", user_first_vars[0])
-                # # tf.summary.histogram("user_layer_1_biases", user_first_vars[1])
-                # tf.summary.histogram("user_layer_1_output", user_layer_1)
-                #
-                # tf.summary.histogram("user_layer_2_weights", user_second_vars[0])
-                # # tf.summary.histogram("user_layer_2_biases", user_second_vars[1])
-                # tf.summary.histogram("user_layer_2_output", user_layer_2)
-                # #
-                # tf.summary.histogram("user_layer_3_weights", user_final_vars[0])
-                # # tf.summary.histogram("user_layer_3_biases", user_final_vars[1])
-                # tf.summary.histogram("user_layer_3_output", user_layer_3)
+            # tf.summary.histogram("user_layer_1_weights", user_first_vars[0])
+            # # tf.summary.histogram("user_layer_1_biases", user_first_vars[1])
+            # tf.summary.histogram("user_layer_1_output", user_layer_1)
+            #
+            # tf.summary.histogram("user_layer_2_weights", user_second_vars[0])
+            # # tf.summary.histogram("user_layer_2_biases", user_second_vars[1])
+            # tf.summary.histogram("user_layer_2_output", user_layer_2)
+            # #
+            # tf.summary.histogram("user_layer_3_weights", user_final_vars[0])
+            # # tf.summary.histogram("user_layer_3_biases", user_final_vars[1])
+            # tf.summary.histogram("user_layer_3_output", user_layer_3)
 
             self.user_embedding_final = user_layer_3
 
@@ -455,51 +455,48 @@ class TwoTowerModelFRV5:
             tag_id_embed = tf.nn.embedding_lookup(self.tag_embedding, target_tag_idx)
 
             target_embed_concat = tf.concat([item_id_embed, cate_id_embed, tag_id_embed], axis=-1)
-            with tf.name_scope('item_layers'):
-                item_layer_1 = tf.layers.dense(inputs=target_embed_concat,
-                                               units=256,
-                                               activation=tf.nn.tanh,
-                                               name='item_first',
-                                               kernel_initializer=tf.initializers.glorot_normal(seed=1234),
-                                               use_bias=False
-                                               )
-                item_layer_2 = tf.layers.dense(inputs=item_layer_1,
-                                               units=128,
-                                               activation=tf.nn.tanh,
-                                               name='item_second',
-                                               kernel_initializer=tf.initializers.glorot_normal(seed=1234),
-                                               use_bias=False
-                                               )
+        with tf.name_scope('item_layers'):
+            item_layer_1 = tf.layers.dense(inputs=target_embed_concat,
+                                           units=256,
+                                           activation=tf.nn.tanh,
+                                           name='item_first',
+                                           kernel_initializer=tf.initializers.glorot_normal(seed=1234),
+                                           use_bias=False
+                                           )
+            item_layer_2 = tf.layers.dense(inputs=item_layer_1,
+                                           units=128,
+                                           activation=tf.nn.tanh,
+                                           name='item_second',
+                                           kernel_initializer=tf.initializers.glorot_normal(seed=1234),
+                                           use_bias=False
+                                           )
 
-                # item参数写入summary
-                # item_first_vars = tf.get_collection(tf.GraphKeys.TRAINABLE_VARIABLES, 'item_first')
-                # tf.summary.histogram("item_layer_1_weights", item_first_vars[0])
-                # # tf.summary.histogram("item_layer_1_biases", item_first_vars[1])
-                # tf.summary.histogram("item_layer_1_output", item_layer_1)
+            # item参数写入summary
+            # item_first_vars = tf.get_collection(tf.GraphKeys.TRAINABLE_VARIABLES, 'item_first')
+            # tf.summary.histogram("item_layer_1_weights", item_first_vars[0])
+            # # tf.summary.histogram("item_layer_1_biases", item_first_vars[1])
+            # tf.summary.histogram("item_layer_1_output", item_layer_1)
 
-                self.item_embeding_final = item_layer_2
-
-                ## EAS 上运行必须加
-                self.user_embedding_final_expand = tf.expand_dims(self.user_embedding_final, 1)
-                self.item_embeding_final = tf.transpose(self.item_embeding_final, perm=[0, 2, 1])
-                self.logits = tf.squeeze(tf.matmul(self.user_embedding_final_expand, self.item_embeding_final), axis=1)
-
-                # saved_model 输出
-                tensor_info_logits = tf.saved_model.utils.build_tensor_info(self.logits)
-                self.saved_model_outputs["logits"] = tensor_info_logits
-            # else:
-            # self.logits = tf.matmul(self.user_embedding_final, self.item_embeding_final,
-            #                         transpose_b=True)
-            # pass
+            self.item_embeding_final = item_layer_2
+        #
+        ## 计算logits
+        # self.user_embedding_final_expand = tf.expand_dims(self.user_embedding_final, 1)
+        # self.item_embeding_final = tf.transpose(self.item_embeding_final, perm=[0, 2, 1])
+        self.logits = tf.reduce_sum(tf.multiply(self.user_embedding_final, self.item_embeding_final), -1)
+        #
+        # # saved_model 输出
+        # tensor_info_logits = tf.saved_model.utils.build_tensor_info(self.logits)
+        # self.saved_model_outputs["logits"] = tensor_info_logits
+        # else:
+        # self.logits = tf.matmul(self.user_embedding_final, self.item_embeding_final,
+        #                         transpose_b=True)
+        # pass
 
     def train_model(self):
         # softmax loss
-
         losses = tf.reduce_mean(
             tf.nn.sparse_softmax_cross_entropy_with_logits(labels=self.train_label, logits=self.logits))
-
         softmax_loss = tf.reduce_mean(losses)
-
         # 计算auc
         auc = self.evaluate()
         # auc = tf.constant(0)

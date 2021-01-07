@@ -80,7 +80,7 @@ def main(_):
         # test_file_dir = oss_bucket_dir + test_file_dir
         recall_cnt_file = oss_bucket_dir + recall_cnt_file
         # item_tower_file = oss_bucket_dir + item_tower_file
-        saved_model_dir = oss_bucket_dir + saved_model_dir
+        saved_model_dir = checkpoint_dir + saved_model_dir
 
     # get item cnt
     # item_count, cate_count, tag_count = utils.get_item_cnt(recall_cnt_file)
@@ -127,7 +127,7 @@ def main(_):
             pred_step = 1
 
             if two_tower_model.mode == "train":
-                # train, losses, softmax_losses, auc, lr = two_tower_model.train_model()
+                train, losses, softmax_losses, auc, lr = two_tower_model.train_model()
 
                 # train_writer = tf.summary.FileWriter(summary_dir, sess.graph)
                 # train_writer.add_graph(sess.graph)
@@ -159,69 +159,75 @@ def main(_):
                 # 更新数据到profiler
                 # my_profiler.add_step(step=int(train_step), run_meta=run_metadata)
                 if two_tower_model.mode == "train":
-                    # train_step = two_tower_model.global_step.eval()
-                    #
-                    # # #
-                    # # _, loss, learning_rate = sess.run([train, losses, two_tower_model.learning_rate],
-                    # #                                   run_metadata=run_metadata, options=run_options)
-                    #
-                    # _, loss, softmax_loss, batch_auc, learning_rate = sess.run(
-                    #     [train, losses, softmax_losses, auc, lr])
-                    # loss_sum += loss
-                    # softmax_sum += softmax_loss
-                    # if train_step % two_tower_model.PRINT_STEP == 0:
-                    #     if train_step == 0:
-                    #         print(
-                    #             'time: %s\tEpoch: %d\tGlobal_Train_Step: %d\tTrain_loss: %.8f\tsoftmax_loss: %.8f\tbatch_auc: %.8f\tLearning_rate:%.8f'
-                    #             % (time.strftime("%Y-%m-%d %H:%M:%S", time.localtime()),
-                    #                two_tower_model.train_epoches,
-                    #                train_step, loss_sum, softmax_sum, batch_auc, learning_rate))
-                    #
-                    #     else:
-                    #         print(
-                    #             'time: %s\tEpoch: %d\tGlobal_Train_Step: %d\tTrain_loss: %.8f\tsoftmax_loss: %.8f\tbatch_auc: %.8f\tLearning_rate:%.8f'
-                    #             % (
-                    #                 time.strftime("%Y-%m-%d %H:%M:%S", time.localtime()),
-                    #                 two_tower_model.train_epoches,
-                    #                 train_step,
-                    #                 loss_sum / two_tower_model.PRINT_STEP,
-                    #                 softmax_sum / two_tower_model.PRINT_STEP,
-                    #                 batch_auc,
-                    #                 learning_rate))
-                    #         if train_step % two_tower_model.SAVE_STEP == 0:
-                    #             two_tower_model.save_model(sess=sess, path=checkpoint_dir)
-                    #     loss_sum = 0.0
-                    #     softmax_sum = 0.0
+                    train_step = two_tower_model.global_step.eval()
+
+                    # #
+                    # _, loss, learning_rate = sess.run([train, losses, two_tower_model.learning_rate],
+                    #                                   run_metadata=run_metadata, options=run_options)
+
+                    _, loss, softmax_loss, batch_auc, learning_rate = sess.run(
+                        [train, losses, softmax_losses, auc, lr])
+                    loss_sum += loss
+                    softmax_sum += softmax_loss
+                    if train_step % two_tower_model.PRINT_STEP == 0:
+                        if train_step == 0:
+                            print(
+                                'time: %s\tEpoch: %d\tGlobal_Train_Step: %d\tTrain_loss: %.8f\tsoftmax_loss: %.8f\tbatch_auc: %.8f\tLearning_rate:%.8f'
+                                % (time.strftime("%Y-%m-%d %H:%M:%S", time.localtime()),
+                                   two_tower_model.train_epoches,
+                                   train_step, loss_sum, softmax_sum, batch_auc, learning_rate))
+
+                        else:
+                            print(
+                                'time: %s\tEpoch: %d\tGlobal_Train_Step: %d\tTrain_loss: %.8f\tsoftmax_loss: %.8f\tbatch_auc: %.8f\tLearning_rate:%.8f'
+                                % (
+                                    time.strftime("%Y-%m-%d %H:%M:%S", time.localtime()),
+                                    two_tower_model.train_epoches,
+                                    train_step,
+                                    loss_sum / two_tower_model.PRINT_STEP,
+                                    softmax_sum / two_tower_model.PRINT_STEP,
+                                    batch_auc,
+                                    learning_rate))
+                            if train_step % two_tower_model.SAVE_STEP == 0:
+                                two_tower_model.save_model(sess=sess, path=checkpoint_dir)
+                        loss_sum = 0.0
+                        softmax_sum = 0.0
 
                     # local test
-                    user_ids, target_item_list, target_cate_list, label_embedding, list_embed_init, list_embed_mask_output = sess.run(
-                        [
-                            two_tower_model.user_id,
-                            two_tower_model.user_click_item_list,
-                            two_tower_model.target_item_idx,
-                            two_tower_model.label_item,
-                            two_tower_model.list_embed_init,
-                            two_tower_model.list_embed_mask_output
-                        ])
-                    print("user_ids")
-                    print(user_ids)
-                    print("target_item_list")
-                    print(target_item_list)
-                    print(target_item_list.shape)
-                    print("target_cate_list")
-                    print(target_cate_list)
-                    print("label_embedding")
-                    print(label_embedding)
-                    print("list_embed_init")
-                    print(list_embed_init)
-                    print("list_embed_mask_output")
-                    print(list_embed_mask_output)
-                    # print("auc")
-                    # print(auc)
-                    # print("auc_final")
-                    # print(auc_final)
-                    # print(label.shape)
-                    break
+                    # user_ids, user_click_item_list, target_item_idx, user_item_click_attention_embed, user_embed_concat, user_embedding_final, logits, train_label = sess.run(
+                    #     [
+                    #         two_tower_model.user_id,
+                    #         two_tower_model.user_click_item_list,
+                    #         two_tower_model.target_item_idx,
+                    #         two_tower_model.user_item_click_attention_embed,
+                    #         two_tower_model.user_embed_concat,
+                    #         two_tower_model.user_embedding_final,
+                    #         two_tower_model.logits,
+                    #         two_tower_model.train_label
+                    #     ])
+                    # print("user_ids")
+                    # print(user_ids)
+                    # print("user_click_item_list")
+                    # print(user_click_item_list)
+                    # print(user_click_item_list.shape)
+                    # print("target_item_idx")
+                    # print(target_item_idx)
+                    # print("user_item_click_attention_embed")
+                    # print(user_item_click_attention_embed)
+                    # print(user_item_click_attention_embed.shape)
+                    # print("user_embed_concat")
+                    # print(user_embed_concat)
+                    # print(user_embed_concat.shape)
+                    # print("user_embedding_final")
+                    # print(user_embedding_final)
+                    # print(user_embedding_final.shape)
+                    # print("logits")
+                    # print(logits)
+                    # print(logits.shape)
+                    # print("train_label")
+                    # print(train_label)
+                    # print(train_label.shape)
+                    # break
                 else:
                     if local == 0:
                         sess.run(writer)
