@@ -365,8 +365,10 @@ class TwoTowerModelFRV5:
         self.target_item_embedding = tf.nn.embedding_lookup(item_embedding, target_item_list)
         # 1. label与所有序列元素做点积
         # self.list_embed_mask_dot = tf.multiply(self.list_embed_mask_output, self.target_item_embedding)
-        self.list_embed_mask_matmul = tf.squeeze(
-            tf.matmul(self.target_item_embedding, self.list_embed_mask_output, transpose_b=True))
+        # self.list_embed_mask_matmul_not_squeeze = tf.matmul(self.target_item_embedding, self.list_embed_mask_output,
+        #                                                     transpose_b=True)
+        self.list_embed_mask_matmul = tf.matmul(self.target_item_embedding, self.list_embed_mask_output,
+                                                transpose_b=True)
         # 2. 点积结果取softmax,求出weight
         self.list_embed_mask_softmax = tf.nn.softmax(self.list_embed_mask_matmul)
 
@@ -483,14 +485,11 @@ class TwoTowerModelFRV5:
         # self.user_embedding_final_expand = tf.expand_dims(self.user_embedding_final, 1)
         # self.item_embeding_final = tf.transpose(self.item_embeding_final, perm=[0, 2, 1])
         self.logits = tf.reduce_sum(tf.multiply(self.user_embedding_final, self.item_embeding_final), -1)
-        #
-        # # saved_model 输出
-        # tensor_info_logits = tf.saved_model.utils.build_tensor_info(self.logits)
-        # self.saved_model_outputs["logits"] = tensor_info_logits
-        # else:
-        # self.logits = tf.matmul(self.user_embedding_final, self.item_embeding_final,
-        #                         transpose_b=True)
-        # pass
+        self.prediction_score = tf.nn.softmax(self.logits)
+
+        # saved_model 输出
+        tensor_info_logits = tf.saved_model.utils.build_tensor_info(self.prediction_score)
+        self.saved_model_outputs["logits"] = tensor_info_logits
 
     def train_model(self):
         # softmax loss

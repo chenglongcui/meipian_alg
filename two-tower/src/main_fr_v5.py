@@ -194,39 +194,20 @@ def main(_):
                         softmax_sum = 0.0
 
                     # local test
-                    # user_ids, user_click_item_list, target_item_idx, user_item_click_attention_embed, user_embed_concat, user_embedding_final, logits, train_label = sess.run(
+                    # user_ids, list_embed_mask_matmul, list_embed_mask_matmul_not_squeeze = sess.run(
                     #     [
                     #         two_tower_model.user_id,
-                    #         two_tower_model.user_click_item_list,
-                    #         two_tower_model.target_item_idx,
-                    #         two_tower_model.user_item_click_attention_embed,
-                    #         two_tower_model.user_embed_concat,
-                    #         two_tower_model.user_embedding_final,
-                    #         two_tower_model.logits,
-                    #         two_tower_model.train_label
+                    #         two_tower_model.list_embed_mask_matmul,
+                    #         two_tower_model.list_embed_mask_matmul_not_squeeze
                     #     ])
                     # print("user_ids")
                     # print(user_ids)
-                    # print("user_click_item_list")
-                    # print(user_click_item_list)
-                    # print(user_click_item_list.shape)
-                    # print("target_item_idx")
-                    # print(target_item_idx)
-                    # print("user_item_click_attention_embed")
-                    # print(user_item_click_attention_embed)
-                    # print(user_item_click_attention_embed.shape)
-                    # print("user_embed_concat")
-                    # print(user_embed_concat)
-                    # print(user_embed_concat.shape)
-                    # print("user_embedding_final")
-                    # print(user_embedding_final)
-                    # print(user_embedding_final.shape)
-                    # print("logits")
-                    # print(logits)
-                    # print(logits.shape)
-                    # print("train_label")
-                    # print(train_label)
-                    # print(train_label.shape)
+                    # print("list_embed_mask_matmul")
+                    # print(list_embed_mask_matmul)
+                    # print(list_embed_mask_matmul.shape)
+                    # print("list_embed_mask_matmul_not_squeeze")
+                    # print(list_embed_mask_matmul_not_squeeze)
+                    # print(list_embed_mask_matmul_not_squeeze.shape)
                     # break
                 else:
                     if local == 0:
