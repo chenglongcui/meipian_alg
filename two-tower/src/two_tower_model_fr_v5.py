@@ -485,11 +485,11 @@ class TwoTowerModelFRV5:
         # self.user_embedding_final_expand = tf.expand_dims(self.user_embedding_final, 1)
         # self.item_embeding_final = tf.transpose(self.item_embeding_final, perm=[0, 2, 1])
         self.logits = tf.reduce_sum(tf.multiply(self.user_embedding_final, self.item_embeding_final), -1)
-        self.prediction_score = tf.nn.softmax(self.logits)
 
         # saved_model 输出
-        tensor_info_logits = tf.saved_model.utils.build_tensor_info(self.prediction_score)
-        self.saved_model_outputs["logits"] = tensor_info_logits
+        self.output_score = tf.nn.sigmoid(self.logits)
+        tensor_info_output_score = tf.saved_model.utils.build_tensor_info(self.output_score)
+        self.saved_model_outputs["logits"] = tensor_info_output_score
 
     def train_model(self):
         # softmax loss

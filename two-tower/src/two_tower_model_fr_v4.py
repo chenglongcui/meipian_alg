@@ -450,8 +450,9 @@ class TwoTowerModelFRV4:
                 self.logits = tf.squeeze(tf.matmul(self.user_embedding_final_expand, self.item_embeding_final), axis=1)
 
                 # saved_model 输出
-                tensor_info_logits = tf.saved_model.utils.build_tensor_info(self.logits)
-                self.saved_model_outputs["logits"] = tensor_info_logits
+                self.prediction_score = tf.nn.sigmoid(self.logits)
+                tensor_info_prediction_score = tf.saved_model.utils.build_tensor_info(self.prediction_score)
+                self.saved_model_outputs["logits"] = tensor_info_prediction_score
             # else:
             # self.logits = tf.matmul(self.user_embedding_final, self.item_embeding_final,
             #                         transpose_b=True)
